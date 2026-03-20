@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP8266 Status</title>
+</head>
+<body style="font-family: Arial; text-align: center; margin-top: 50px;">
+
+<h1>ESP8266 Status</h1>
+<h2 id="status">Checking...</h2>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase.js"></script>
+
+<script>
+  // YOUR FIREBASE CONFIG
+  const firebaseConfig = {
+    apiKey: "AIzaSyA0TZDZBYlQBdvxN5uCmdKRB2wQT8BfvHA",
+    authDomain: "realtime-cd6c3.firebaseapp.com",
+    databaseURL: "https://realtime-cd6c3-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "realtime-cd6c3",
+  };
+
+  firebase.initializeApp(firebaseConfig);
+
+  const db = firebase.database();
+
+  const statusText = document.getElementById("status");
+
+  db.ref("/esp/status").on("value", (snapshot) => {
+    const lastUpdate = snapshot.val();
+    const now = Date.now();
+
+    // If updated within 10 seconds → ONLINE
+    if (now - lastUpdate < 10000) {
+      statusText.innerHTML = "🟢 ONLINE";
+    } else {
+      statusText.innerHTML = "🔴 OFFLINE";
+    }
+  });
+</script>
+
+</body>
+</html>
