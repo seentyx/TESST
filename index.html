@@ -28,17 +28,15 @@
 
   const statusText = document.getElementById("status");
 
-  db.ref("/esp/status").on("value", (snapshot) => {
-    const lastUpdate = snapshot.val();
-    const now = Date.now();
-
-    // If updated within 10 seconds → ONLINE
-    if (now - lastUpdate < 10000) {
-      statusText.innerHTML = "🟢 ONLINE";
-    } else {
-      statusText.innerHTML = "🔴 OFFLINE";
-    }
-  });
+db.ref("/esp/status").on("value", (snapshot) => {
+  const lastUpdate = snapshot.val();
+  const now = Math.floor(Date.now() / 1000); // convert JS milliseconds to seconds
+  if (now - lastUpdate < 10) {
+    statusText.innerHTML = "🟢 ONLINE";
+  } else {
+    statusText.innerHTML = "🔴 OFFLINE";
+  }
+});
 </script>
 
 </body>
