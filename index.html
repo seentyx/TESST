@@ -10,7 +10,7 @@
 <!-- Firebase core -->
 <script>
 const SUPABASE_URL = "https://bjmokvjpitviifjbnlvs.supabase.co";
-const SUPABASE_KEY = "YOUR_ANON_KEY"; // keep your key here
+const SUPABASE_KEY = "YOUR_ANON_KEY";
 
 const statusText = document.getElementById("status");
 
@@ -23,9 +23,15 @@ async function checkStatus() {
       }
     });
 
+    if (!res.ok) {
+      statusText.innerHTML = "❌ HTTP " + res.status;
+      console.error("HTTP Error:", res.status);
+      return;
+    }
+
     const data = await res.json();
 
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
       statusText.innerHTML = "⚠️ NO DATA";
       return;
     }
@@ -45,7 +51,6 @@ async function checkStatus() {
   }
 }
 
-// check every 3 seconds
 setInterval(checkStatus, 3000);
 checkStatus();
 </script>
