@@ -1,66 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ESP8266 Status</title>
+  <title>ESP8266 Health Monitor</title>
 </head>
 
 <body style="font-family: Arial; text-align: center; margin-top: 50px;">
 
-<h1>ESP8266 Status</h1>
+<h1>Health Monitor</h1>
+
 <h2 id="status">Checking...</h2>
+<p>BPM: <span id="bpm">--</span></p>
+<p>Body Temp: <span id="body">--</span></p>
+<p>Air Temp: <span id="air">--</span></p>
+<p>Humidity: <span id="hum">--</span></p>
 
 <script>
 const SUPABASE_URL = "https://bjmokvjpitviifjbnlvs.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqbW9rdmpwaXR2aWlmamJubHZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxMzkzMTEsImV4cCI6MjA4OTcxNTMxMX0.yEp_qZzGTArPrc03Om7_LL0jUiTDckUiaWZyxj047Ng";
 
-const statusText = document.getElementById("status");
-
-async function checkStatus() {
+async function fetchData() {
   try {
-    const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/status?select=last_seen&order=id.desc&limit=1`,
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/status?select=*&order=id.desc&limit=1`,
       {
-        method: "GET",
         headers: {
           "apikey": SUPABASE_KEY,
-          "Authorization": "Bearer " + SUPABASE_KEY,
-          "Content-Type": "application/json"
+          "Authorization": "Bearer " + SUPABASE_KEY
         }
       }
     );
 
-    // 🔥 Handle HTTP errors properly
-    if (!response.ok) {
-      statusText.innerHTML = "❌ ERROR " + response.status;
-      console.error("HTTP Error:", response.status);
+    if (!res.ok) {
+      document.getElementById("status").innerHTML = "❌ ERROR";
       return;
     }
 
-    const data = await response.json();
+    const data = await res.json();
 
-    if (!data || data.length === 0) {
-      statusText.innerHTML = "⚠️ NO DATA";
+    if (data.length === 0) {
+      document.getElementById("status").innerHTML = "⚠️ NO DATA";
       return;
     }
 
-    const lastUpdate = data[0].last_seen;
+    const d = data[0];
+
+    // Show values
+    document.getElementById("bpm").innerText = d.bpm;
+    document.getElementById("body").innerText = d.body_temp + " °C";
+    document.getElementById("air").innerText = d.air_temp + " °C";
+    document.getElementById("hum").innerText = d.humidity + " %";
+
+    // Online check
     const now = Math.floor(Date.now() / 1000);
-
-    if (now - lastUpdate < 10) {
-      statusText.innerHTML = "🟢 ONLINE";
+    if (now - d.last_seen < 10) {
+      document.getElementById("status").innerHTML = "🟢 ONLINE";
     } else {
-      statusText.innerHTML = "🔴 OFFLINE";
+      document.getElementById("status").innerHTML = "🔴 OFFLINE";
     }
 
-  } catch (error) {
-    statusText.innerHTML = "❌ FETCH ERROR";
-    console.error(error);
+  } catch (err) {
+    document.getElementById("status").innerHTML = "❌ FETCH ERROR";
   }
 }
 
-// Run every 3 seconds
-setInterval(checkStatus, 3000);
-checkStatus();
+// refresh every 3 sec
+setInterval(fetchData, 3000);
+fetchData();
 </script>
 
 </body>
