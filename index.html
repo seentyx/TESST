@@ -1,72 +1,570 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>ESP8266 Health Monitor</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0e1a;
+    --surface:  #111827;
+    --border:   rgba(255,255,255,0.07);
+    --text:     #e2e8f0;
+    --muted:    #4b5563;
+    --green:    #10b981;
+    --orange:   #f97316;
+    --yellow:   #fbbf24;
+    --blue:     #38bdf8;
+    --red:      #f87171;
+    --mono:     'Space Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 24px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(56,189,248,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56,189,248,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #10b981, #0d9488);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+    letter-spacing: 0.05em;
+  }
+
+  /* Status badge */
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    transition: all 0.4s ease;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s ease;
+    flex-shrink: 0;
+  }
+
+  .status-badge.online  { border-color: rgba(16,185,129,0.3); }
+  .status-badge.online  .status-dot { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .status-badge.offline { border-color: rgba(248,113,113,0.3); }
+  .status-badge.offline .status-dot { background: var(--red); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  /* Last seen */
+  .last-seen {
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Cards grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s ease, transform 0.2s ease;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Accent glow in top corner */
+  .card::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    opacity: 0.06;
+    pointer-events: none;
+  }
+
+  .card.bpm::before     { background: var(--green); }
+  .card.body::before    { background: var(--orange); }
+  .card.air::before     { background: var(--yellow); }
+  .card.humidity::before { background: var(--blue); }
+
+  .card.bpm     { border-color: rgba(16,185,129,0.15); }
+  .card.body    { border-color: rgba(249,115,22,0.15); }
+  .card.air     { border-color: rgba(251,191,36,0.15); }
+  .card.humidity { border-color: rgba(56,189,248,0.15); }
+
+  .card-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .card-value {
+    font-family: var(--mono);
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    transition: color 0.4s ease, opacity 0.4s ease;
+  }
+
+  .card-unit {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .bpm     .card-value { color: var(--green); }
+  .body    .card-value { color: var(--orange); }
+  .air     .card-value { color: var(--yellow); }
+  .humidity .card-value { color: var(--blue); }
+
+  /* Finger prompt overlay */
+  .finger-prompt {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10,14,26,0.85);
+    border-radius: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .finger-prompt.show { display: flex; }
+
+  .finger-icon { font-size: 28px; opacity: 0.4; }
+
+  /* History chart area */
+  .card.wide {
+    grid-column: 1 / -1;
+  }
+
+  .chart-wrap {
+    height: 80px;
+    position: relative;
+    margin-top: 12px;
+  }
+
+  canvas#bpmChart {
+    width: 100% !important;
+    height: 80px !important;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .refresh-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .refresh-bar {
+    width: 80px;
+    height: 2px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .refresh-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width linear;
+  }
+
+  /* Shimmer loading state */
+  .shimmer {
+    background: linear-gradient(90deg, var(--surface) 25%, rgba(255,255,255,0.04) 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+    color: transparent !important;
+    user-select: none;
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Value update flash */
+  @keyframes flash {
+    0%   { opacity: 0.4; }
+    100% { opacity: 1; }
+  }
+
+  .flash { animation: flash 0.3s ease; }
+
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: 1fr; }
+    .card-value { font-size: 40px; }
+    header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  }
+</style>
 </head>
+<body>
+<div class="wrapper">
 
-<body style="font-family: Arial; text-align: center; margin-top: 50px;">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">♥</div>
+      <div>
+        <div class="logo-text">Health Monitor</div>
+        <div class="logo-sub">ESP8266 · Supabase</div>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div class="status-badge" id="statusBadge">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Connecting...</span>
+      </div>
+      <div class="last-seen" id="lastSeen">—</div>
+    </div>
+  </header>
 
-<h1>Health Monitor</h1>
+  <div class="grid">
 
-<h2 id="status">Checking...</h2>
-<p>BPM: <span id="bpm">--</span></p>
-<p>Body Temp: <span id="body">--</span></p>
-<p>Air Temp: <span id="air">--</span></p>
-<p>Humidity: <span id="hum">--</span></p>
+    <!-- BPM -->
+    <div class="card bpm">
+      <div class="card-label">Heart Rate</div>
+      <div class="card-value shimmer" id="bpm">---</div>
+      <div class="card-unit">beats per minute</div>
+      <div class="finger-prompt" id="fingerPrompt">
+        <div class="finger-icon">☝</div>
+        <span>Place finger on sensor</span>
+      </div>
+    </div>
+
+    <!-- Body Temp -->
+    <div class="card body">
+      <div class="card-label">Body Temp · DS18B20</div>
+      <div class="card-value shimmer" id="bodyTemp">---</div>
+      <div class="card-unit">degrees celsius</div>
+    </div>
+
+    <!-- Air Temp -->
+    <div class="card air">
+      <div class="card-label">Air Temp · DHT11</div>
+      <div class="card-value shimmer" id="airTemp">---</div>
+      <div class="card-unit">degrees celsius</div>
+    </div>
+
+    <!-- Humidity -->
+    <div class="card humidity">
+      <div class="card-label">Humidity · DHT11</div>
+      <div class="card-value shimmer" id="humidity">---</div>
+      <div class="card-unit">percent relative humidity</div>
+    </div>
+
+    <!-- BPM history chart -->
+    <div class="card wide">
+      <div class="card-label">Heart Rate History</div>
+      <div class="chart-wrap">
+        <canvas id="bpmChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <span>Device: ESP8266 · Supabase realtime</span>
+    <div class="refresh-indicator">
+      <span>Refresh in</span>
+      <div class="refresh-bar"><div class="refresh-fill" id="refreshFill"></div></div>
+      <span id="countdown">5s</span>
+    </div>
+  </footer>
+
+</div>
 
 <script>
 const SUPABASE_URL = "https://bjmokvjpitviifjbnlvs.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqbW9rdmpwaXR2aWlmamJubHZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxMzkzMTEsImV4cCI6MjA4OTcxNTMxMX0.yEp_qZzGTArPrc03Om7_LL0jUiTDckUiaWZyxj047Ng";
 
+const REFRESH_MS   = 5000;
+const OFFLINE_SECS = 12; // if last_seen older than this → offline
+
+// BPM history (last 20 readings)
+const bpmHistory = [];
+const MAX_HISTORY = 20;
+
+let firstLoad = true;
+
+// ── Simple line chart (no library needed) ──────────
+const canvas  = document.getElementById('bpmChart');
+const ctx     = canvas.getContext('2d');
+
+function drawChart() {
+  const dpr = window.devicePixelRatio || 1;
+  const w   = canvas.parentElement.clientWidth;
+  const h   = 80;
+  canvas.width  = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const valid = bpmHistory.filter(v => v > 0);
+  if (valid.length < 2) {
+    ctx.fillStyle = 'rgba(75,85,99,0.5)';
+    ctx.font = '11px "Space Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for readings...', w / 2, h / 2 + 4);
+    return;
+  }
+
+  const min = Math.max(40, Math.min(...valid) - 10);
+  const max = Math.min(200, Math.max(...valid) + 10);
+  const pts = bpmHistory.map((v, i) => ({
+    x: (i / (bpmHistory.length - 1)) * (w - 20) + 10,
+    y: h - 10 - ((v - min) / (max - min)) * (h - 20)
+  }));
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(16,185,129,0.25)');
+  grad.addColorStop(1, 'rgba(16,185,129,0)');
+
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, h);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length - 1].x, h);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = '#10b981';
+  ctx.lineWidth   = 2;
+  ctx.lineJoin    = 'round';
+  ctx.stroke();
+
+  // Latest dot
+  const last = pts[pts.length - 1];
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+  ctx.fillStyle   = '#10b981';
+  ctx.shadowColor = '#10b981';
+  ctx.shadowBlur  = 8;
+  ctx.fill();
+  ctx.shadowBlur  = 0;
+}
+
+// ── Helpers ───────────────────────────────────────
+function setValue(id, val, suffix = '') {
+  const el = document.getElementById(id);
+  if (el.classList.contains('shimmer')) el.classList.remove('shimmer');
+  const newText = val !== null && val !== undefined ? val + suffix : '--';
+  if (el.textContent !== newText) {
+    el.textContent = newText;
+    el.classList.remove('flash');
+    void el.offsetWidth; // reflow to restart animation
+    el.classList.add('flash');
+  }
+}
+
+function setStatus(online) {
+  const badge = document.getElementById('statusBadge');
+  const text  = document.getElementById('statusText');
+  badge.className = 'status-badge ' + (online ? 'online' : 'offline');
+  text.textContent = online ? 'ONLINE' : 'OFFLINE';
+}
+
+function formatLastSeen(unixTs) {
+  const d   = new Date(unixTs * 1000);
+  const now = new Date();
+  const diffS = Math.floor((now - d) / 1000);
+  if (diffS < 60)  return `Last seen ${diffS}s ago`;
+  if (diffS < 3600) return `Last seen ${Math.floor(diffS/60)}m ago`;
+  return `Last seen ${d.toLocaleTimeString()}`;
+}
+
+// ── Fetch ─────────────────────────────────────────
 async function fetchData() {
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/status?select=*&order=id.desc&limit=1`,
-      {
-        headers: {
-          "apikey": SUPABASE_KEY,
-          "Authorization": "Bearer " + SUPABASE_KEY
-        }
-      }
+      { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }
     );
 
-    if (!res.ok) {
-      document.getElementById("status").innerHTML = "❌ ERROR";
-      return;
-    }
+    if (!res.ok) { setStatus(false); return; }
 
     const data = await res.json();
+    if (!data.length) { setStatus(false); return; }
 
-    if (data.length === 0) {
-      document.getElementById("status").innerHTML = "⚠️ NO DATA";
-      return;
-    }
-
-    const d = data[0];
-
-    // Show values
-    document.getElementById("bpm").innerText = d.bpm;
-    document.getElementById("body").innerText = d.body_temp + " °C";
-    document.getElementById("air").innerText = d.air_temp + " °C";
-    document.getElementById("hum").innerText = d.humidity + " %";
-
-    // Online check
+    const d   = data[0];
     const now = Math.floor(Date.now() / 1000);
-    if (now - d.last_seen < 10) {
-      document.getElementById("status").innerHTML = "🟢 ONLINE";
-    } else {
-      document.getElementById("status").innerHTML = "🔴 OFFLINE";
-    }
+    const age = now - d.last_seen;
 
-  } catch (err) {
-    document.getElementById("status").innerHTML = "❌ FETCH ERROR";
+    setStatus(age < OFFLINE_SECS);
+    document.getElementById('lastSeen').textContent = formatLastSeen(d.last_seen);
+
+    // BPM — show finger prompt if 0 or null
+    const bpm = d.bpm || 0;
+    if (bpm > 0) {
+      setValue('bpm', bpm);
+      document.getElementById('fingerPrompt').classList.remove('show');
+      bpmHistory.push(bpm);
+    } else {
+      setValue('bpm', '--');
+      document.getElementById('fingerPrompt').classList.add('show');
+      bpmHistory.push(0);
+    }
+    if (bpmHistory.length > MAX_HISTORY) bpmHistory.shift();
+
+    setValue('bodyTemp', d.body_temp !== null ? parseFloat(d.body_temp).toFixed(1) : '--');
+    setValue('airTemp',  d.air_temp  !== null ? parseFloat(d.air_temp).toFixed(1)  : '--');
+    setValue('humidity', d.humidity  !== null ? parseFloat(d.humidity).toFixed(1)  : '--');
+
+    drawChart();
+    firstLoad = false;
+
+  } catch (e) {
+    console.error(e);
+    setStatus(false);
   }
 }
 
-// refresh every 3 sec
-setInterval(fetchData, 3000);
-fetchData();
-</script>
+// ── Countdown bar ─────────────────────────────────
+let countdownStart = Date.now();
 
+function tickCountdown() {
+  const elapsed  = Date.now() - countdownStart;
+  const pct      = Math.min(100, (elapsed / REFRESH_MS) * 100);
+  const remaining = Math.max(0, Math.ceil((REFRESH_MS - elapsed) / 1000));
+  document.getElementById('refreshFill').style.width = pct + '%';
+  document.getElementById('countdown').textContent   = remaining + 's';
+}
+
+// ── Init ──────────────────────────────────────────
+fetchData();
+setInterval(() => {
+  countdownStart = Date.now();
+  fetchData();
+}, REFRESH_MS);
+
+setInterval(tickCountdown, 100);
+window.addEventListener('resize', drawChart);
+</script>
 </body>
 </html>
